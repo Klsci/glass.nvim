@@ -63,51 +63,90 @@ local default_config = {
 M.config = default_config
 local original_colorscheme = vim.cmd.colorscheme
 
+local function hex_to_rgb(color)
+  local r = bit.rshift(color, 16) & 0xFF
+  local g = bit.rshift(color, 8) & 0xFF
+  local b = color & 0xFF
+  return r, g, b
+end
+
+-- blend color with black based on opacity
+local function apply_opacity(color, opacity)
+  if not color then return nil end
+  local r, g, b = hex_to_rgb(color)
+  local new_r = math.floor(r * opacity)
+  local new_g = math.floor(g * opacity)
+  local new_b = math.floor(b * opacity)
+  local bit = require("bit")
+  return bit.bor(bit.lshift(new_r, 16), bit.lshift(new_g, 8), new_b)
+end
+
+
 -- Function to create glass effect for a highlight group
-local function create_glass(group_name, opacity_level, border_color)
+-- local function create_glass(group_name, opacity_level, border_color)
+--   local success, hl_info = pcall(vim.api.nvim_get_hl, 0, { name = group_name })
+--   if success and hl_info then
+--     -- Create a new highlight table with the correct structure
+--     local new_hl = {
+--       fg = hl_info.fg,
+--       bg = hl_info.bg,
+--       sp = hl_info.sp,
+--       bold = hl_info.bold,
+--       italic = hl_info.italic,
+--       underline = hl_info.underline,
+--       undercurl = hl_info.undercurl,
+--       underdouble = hl_info.underdouble,
+--       underdotted = hl_info.underdotted,
+--       underdashed = hl_info.underdashed,
+--       strikethrough = hl_info.strikethrough,
+--       reverse = hl_info.reverse,
+--       standout = hl_info.standout,
+--     }
+--
+--     -- Override background color if opacity is specified
+--     if opacity_level > 0 then
+--       local overlay_colors = {
+--         [0.05] = 0x050505, -- Minimal tint
+--         [0.08] = 0x080808, -- Status line
+--         [0.1] = 0x0a0a0a,  -- Very subtle
+--         [0.12] = 0x0c0c0c, -- Sidebar subtle
+--         [0.15] = 0x0f0f0f, -- Sidebar normal
+--         [0.18] = 0x121212, -- Float subtle
+--         [0.2] = 0x141414,  -- Float normal
+--         [0.22] = 0x161616, -- Popup subtle
+--         [0.25] = 0x1a1a1a, -- Popup normal
+--         [0.3] = 0x1e1e1e,  -- Strong glass
+--       }
+--       new_hl.bg = overlay_colors[opacity_level] or 0x0f0f0f
+--     end
+--
+-- Add border if specified
+-- if border_color and M.config.glass.frosted_borders then
+--   new_hl.border = border_color
+-- end
+--
+--     vim.api.nvim_set_hl(0, group_name, new_hl)
+--   end
+-- end
+--
+
+local function create_glass(group_name, opacity)
   local success, hl_info = pcall(vim.api.nvim_get_hl, 0, { name = group_name })
-  if success and hl_info then
-    -- Create a new highlight table with the correct structure
-    local new_hl = {
-      fg = hl_info.fg,
-      bg = hl_info.bg,
-      sp = hl_info.sp,
-      bold = hl_info.bold,
-      italic = hl_info.italic,
-      underline = hl_info.underline,
-      undercurl = hl_info.undercurl,
-      underdouble = hl_info.underdouble,
-      underdotted = hl_info.underdotted,
-      underdashed = hl_info.underdashed,
-      strikethrough = hl_info.strikethrough,
-      reverse = hl_info.reverse,
-      standout = hl_info.standout,
-    }
-
-    -- Override background color if opacity is specified
-    if opacity_level > 0 then
-      local overlay_colors = {
-        [0.05] = 0x050505, -- Minimal tint
-        [0.08] = 0x080808, -- Status line
-        [0.1] = 0x0a0a0a,  -- Very subtle
-        [0.12] = 0x0c0c0c, -- Sidebar subtle
-        [0.15] = 0x0f0f0f, -- Sidebar normal
-        [0.18] = 0x121212, -- Float subtle
-        [0.2] = 0x141414,  -- Float normal
-        [0.22] = 0x161616, -- Popup subtle
-        [0.25] = 0x1a1a1a, -- Popup normal
-        [0.3] = 0x1e1e1e,  -- Strong glass
-      }
-      new_hl.bg = overlay_colors[opacity_level] or 0x0f0f0f
-    end
-
-    -- Add border if specified
-    -- if border_color and M.config.glass.frosted_borders then
-    --   new_hl.border = border_color
-    -- end
-
-    vim.api.nvim_set_hl(0, group_name, new_hl)
+  if not success or not hl_info then
+    return
   end
+
+  local new_hl = vim.tbl_extend("force", hl_info, {})
+
+  if opacity > 0 then
+    new_hl.bg = apply_opacity(hl_info.bg, opacity) or nil
+    new_hl.blend = math.floor((1 - opacity) * 100)
+  else
+    new_hl.bg = nil
+    new_hl.blend = 0
+  end
+
+  vim.api.nvim_set_hl(0, group_name, new_hl)
 end
 
 -- Main transparency function
@@ -155,33 +194,33 @@ local function apply_transparency()
     -- Floating windows
     for _, group in ipairs({ 'NormalFloat', 'TelescopeNormal', 'WhichKeyFloat', 'LspFloatWinNormal', 'LazyNormal' }) do
       if not vim.tbl_contains(M.config.exclude_groups, group) then
-        create_glass(group, M.config.glass.panel_opacity.floats, "#2a2a2a")
+        create_glass(group, M.config.glass.panel_opacity.floats)
       end
     end
 
     -- Popup menus
     for _, group in ipairs({ 'Pmenu', 'PmenuSel', 'CmpNormal' }) do
       if not vim.tbl_contains(M.config.exclude_groups, group) then
-        create_glass(group, M.config.glass.panel_opacity.popups, "#333333")
+        create_glass(group, M.config.glass.panel_opacity.popups)
       end
     end
 
     -- Handling for borders to create frosted glass effect
     if M.config.glass.frosted_borders then
       vim.api.nvim_set_hl(0, "FloatBorder", {
-        bg = "#1a1a1a",
+        bg = "NONE",
         fg = "#4a4a4a"
       })
       vim.api.nvim_set_hl(0, "TelescopeBorder", {
-        bg = "#1a1a1a",
+        bg = "NONE",
         fg = "#4a4a4a"
       })
       vim.api.nvim_set_hl(0, "VertSplit", {
-        bg = "none",
+        bg = "NONE",
         fg = "#2a2a2a"
       })
       vim.api.nvim_set_hl(0, "WinSeparator", {
-        bg = "none",
+        bg = "NONE",
         fg = "#2a2a2a"
       })
     end
@@ -290,6 +329,8 @@ function M.setup(user_config)
 end
 
 -- Utility functions
+
+-- Convert color int to rgb
 function M.clear_prefix(prefix)
   local groups = get_all_highlight_groups()
   for _, group in ipairs(groups) do
