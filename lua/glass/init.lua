@@ -63,35 +63,50 @@ local default_config = {
 M.config = default_config
 local original_colorscheme = vim.cmd.colorscheme
 
--- Function to create glass effect
+-- Function to create glass effect for a highlight group
 local function create_glass(group_name, opacity_level, border_color)
-  local success, hl = pcall(vim.api.nvim_get_hl, 0, { name = group_name })
-  if success and hl then
-    local bg_color = nil
+  local success, hl_info = pcall(vim.api.nvim_get_hl, 0, { name = group_name })
+  if success and hl_info then
+    -- Create a new highlight table with the correct structure
+    local new_hl = {
+      fg = hl_info.fg,
+      bg = hl_info.bg,
+      sp = hl_info.sp,
+      bold = hl_info.bold,
+      italic = hl_info.italic,
+      underline = hl_info.underline,
+      undercurl = hl_info.undercurl,
+      underdouble = hl_info.underdouble,
+      underdotted = hl_info.underdotted,
+      underdashed = hl_info.underdashed,
+      strikethrough = hl_info.strikethrough,
+      reverse = hl_info.reverse,
+      standout = hl_info.standout,
+    }
+
+    -- Override background color if opacity is specified
     if opacity_level > 0 then
       local overlay_colors = {
-        [0.05] = "#050505", -- Minimal tint
-        [0.08] = "#080808", -- Status line
-        [0.1] = "#0a0a0a",  -- Very subtle
-        [0.12] = "#0c0c0c", -- Sidebar subtle
-        [0.15] = "#0f0f0f", -- Sidebar normal
-        [0.18] = "#121212", -- Float subtle
-        [0.2] = "#141414",  -- Float normal
-        [0.22] = "#161616", -- Popup subtle
-        [0.25] = "#1a1a1a", -- Popup normal
-        [0.3] = "#1e1e1e",  -- Strong glass
+        [0.05] = 0x050505, -- Minimal tint
+        [0.08] = 0x080808, -- Status line
+        [0.1] = 0x0a0a0a,  -- Very subtle
+        [0.12] = 0x0c0c0c, -- Sidebar subtle
+        [0.15] = 0x0f0f0f, -- Sidebar normal
+        [0.18] = 0x121212, -- Float subtle
+        [0.2] = 0x141414,  -- Float normal
+        [0.22] = 0x161616, -- Popup subtle
+        [0.25] = 0x1a1a1a, -- Popup normal
+        [0.3] = 0x1e1e1e,  -- Strong glass
       }
-      bg_color = overlay_colors[opacity_level] or "#0f0f0f"
+      new_hl.bg = overlay_colors[opacity_level] or 0x0f0f0f
     end
 
-    hl.bg = bg_color
+    -- Add border if specified
+    if border_color and M.config.glass.frosted_borders then
+      new_hl.border = border_color
+    end
 
-    -- -- Add border if specified
-    -- if border_color and M.config.glass.frosted_borders then
-    --   hl.border = border_color
-    -- end
-
-    vim.api.nvim_set_hl(0, group_name, hl)
+    vim.api.nvim_set_hl(0, group_name, new_hl)
   end
 end
 
