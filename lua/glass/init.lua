@@ -9,7 +9,7 @@ local default_config = {
   -- Glass pane effect settings
   glass = {
     enable = true,
-    opacity = 0.85,
+    opacity = 0.3,
     blur_background = true,
     frosted_borders = true,
     panel_opacity = {
@@ -86,10 +86,10 @@ local function create_glass(group_name, opacity_level, border_color)
 
     hl.bg = bg_color
 
-    -- Add border if specified
-    if border_color and M.config.glass.frosted_borders then
-      hl.border = border_color
-    end
+    -- -- Add border if specified
+    -- if border_color and M.config.glass.frosted_borders then
+    --   hl.border = border_color
+    -- end
 
     vim.api.nvim_set_hl(0, group_name, hl)
   end
