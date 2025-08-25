@@ -64,9 +64,9 @@ M.config = default_config
 local original_colorscheme = vim.cmd.colorscheme
 
 local function hex_to_rgb(color)
-  local r = bit.rshift(color, 16) & 0xFF
-  local g = bit.rshift(color, 8) & 0xFF
-  local b = color & 0xFF
+  local r = bit.band(bit.rshift(color, 16), 0xFF)
+  local g = bit.band(bit.rshift(color, 8), 0xFF)
+  local b = bit.band(color, 0xFF)
   return r, g, b
 end
 
