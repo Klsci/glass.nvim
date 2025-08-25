@@ -1,0 +1,317 @@
+-- glass.nvim - Universal transparency plugin with glass pane effects
+-- Author: Klsci
+-- License: MIT
+
+local M = {}
+
+-- Default configuration
+local default_config = {
+  -- Glass pane effect settings
+  glass = {
+    enable = true,
+    opacity = 0.85,
+    blur_background = true,
+    frosted_borders = true,
+    panel_opacity = {
+      editor = 0.0,     -- Main editor completely transparent
+      sidebar = 0.15,   -- Sidebar slightly less
+      statusline = 0.1, -- Status line not too distracting but readable
+      floats = 0.2,     -- Floating windows distinct for focus
+      popups = 0.25,    -- Popups most visible
+    }
+  },
+  -- Groups that should always be transparent
+  groups = {
+    'Normal', 'NormalNC', 'Comment', 'Constant', 'Special', 'Identifier',
+    'Statement', 'PreProc', 'Type', 'Underlined', 'Todo', 'String', 'Function',
+    'Conditional', 'Repeat', 'Operator', 'Structure', 'LineNr', 'NonText',
+    'SignColumn', 'CursorColumn', 'CursorLine', 'TabLine', 'TabLineSel', 'TabLineFill',
+    'StatusLine', 'StatusLineNC', 'VertSplit', 'WinSeparator', 'Visual', 'VisualNOS',
+    'Folded', 'FoldColumn', 'DiffAdd', 'DiffChange', 'DiffDelete', 'DiffText',
+    'SignColumn', 'Conceal', 'EndOfBuffer', 'SearchResult'
+  },
+  -- Extra groups (plugin-specific)
+  extra_groups = {
+    'NormalFloat', 'FloatBorder', 'Pmenu', 'PmenuSel', 'PmenuSbar', 'PmenuThumb',
+    'TelescopeNormal', 'TelescopeBorder', 'TelescopePromptNormal', 'TelescopePromptBorder',
+    'TelescopePromptTitle', 'TelescopePreviewTitle', 'TelescopeResultsTitle',
+    'NvimTreeNormal', 'NvimTreeNormalNC', 'NvimTreeRootFolder', 'NeoTreeNormal', 'NeoTreeNormalNC',
+    'WhichKey', 'WhichKeyFloat', 'WhichKeyGroup', 'WhichKeyDesc',
+    'GitSignsAdd', 'GitSignsChange', 'GitSignsDelete',
+    'LspDiagnosticsDefaultError', 'LspDiagnosticsDefaultWarning', 'LspDiagnosticsDefaultInformation',
+    'LspDiagnosticsDefaultHint',
+    'DiagnosticError', 'DiagnosticWarn', 'DiagnosticInfo', 'DiagnosticHint',
+    'CmpNormal', 'CmpBorder', 'CmpDocumentation', 'CmpDocumentationBorder',
+    'NotifyBackground', 'NotifyERRORBody', 'NotifyWARNBody', 'NotifyINFOBody', 'NotifyDEBUGBody', 'NotifyTRACEBody',
+    'MasonNormal', 'MasonHeader', 'MasonHighlight',
+    'LazyNormal', 'LazyButton', 'LazyButtonActive',
+  },
+  -- Exclude certain groups from transparency
+  exclude_groups = {},
+  -- Exclude specific colorschemes from auto-transparency
+  exclude_schemes = {},
+  -- Enable/disable features
+  enable = {
+    cursorline = true,
+    statusline = true,
+    tabline = true,
+    winbar = true,
+  }
+}
+
+-- Module state
+M.config = default_config
+local original_colorscheme = vim.cmd.colorscheme
+
+-- Function to create glass effect
+local function create_glass(group_name, opacity_level, border_color)
+  local success, hl = pcall(vim.api.nvim_get_hl, 0, { name = group_name })
+  if success and hl then
+    local bg_color = nil
+    if opacity_level > 0 then
+      local overlay_colors = {
+        [0.05] = "#050505", -- Minimal tint
+        [0.08] = "#080808", -- Status line
+        [0.1] = "#0a0a0a",  -- Very subtle
+        [0.12] = "#0c0c0c", -- Sidebar subtle
+        [0.15] = "#0f0f0f", -- Sidebar normal
+        [0.18] = "#121212", -- Float subtle
+        [0.2] = "#141414",  -- Float normal
+        [0.22] = "#161616", -- Popup subtle
+        [0.25] = "#1a1a1a", -- Popup normal
+        [0.3] = "#1e1e1e",  -- Strong glass
+      }
+      bg_color = overlay_colors[opacity_level] or "#0f0f0f"
+    end
+
+    hl.bg = bg_color
+
+    -- Add border if specified
+    if border_color and M.config.glass.frosted_borders then
+      hl.border = border_color
+    end
+
+    vim.api.nvim_set_hl(0, group_name, hl)
+  end
+end
+
+-- Main transparency function
+local function apply_transparency()
+  -- Skip if current colorscheme is in exclude list
+  local current_scheme = vim.g.colors_name or ""
+  if vim.tbl_contains(M.config.exclude_schemes, current_scheme) then
+    return
+  end
+
+  if M.config.glass.enable then
+    -- Apply glass effects
+    -- Main editor area
+    for _, group in ipairs({ 'Normal', 'NormalNC', 'SignColumn', 'LineNr', 'EndOfBuffer' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass(group, M.config.glass.panel_opacity.editor)
+      end
+    end
+
+    -- Sidebar elements
+    for _, group in ipairs({ 'NvimTreeNormal', 'NeoTreeNormal', 'NvimTreeNormalNC', 'NeoTreeNormalNC' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass(group, M.config.glass.panel_opacity.sidebar)
+      end
+    end
+
+    -- Status line
+    if M.config.enable.statusline then
+      for _, group in ipairs({ 'StatusLine', 'StatusLineNC' }) do
+        if not vim.tbl_contains(M.config.exclude_groups, group) then
+          create_glass(group, M.config.glass.panel_opacity.statusline)
+        end
+      end
+    end
+
+    -- Tab line
+    if M.config.enable.tabline then
+      for _, group in ipairs({ 'TabLine', 'TabLineFill', 'TabLineSel' }) do
+        if not vim.tbl_contains(M.config.exclude_groups, group) then
+          create_glass(group, M.config.glass.panel_opacity.statusline)
+        end
+      end
+    end
+
+    -- Floating windows
+    for _, group in ipairs({ 'NormalFloat', 'TelescopeNormal', 'WhichKeyFloat', 'LspFloatWinNormal', 'LazyNormal' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass(group, M.config.glass.panel_opacity.floats, "#2a2a2a")
+      end
+    end
+
+    -- Popup menus
+    for _, group in ipairs({ 'Pmenu', 'PmenuSel', 'CmpNormal' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass(group, M.config.glass.panel_opacity.popups, "#333333")
+      end
+    end
+
+    -- Handling for borders to create frosted glass effect
+    if M.config.glass.frosted_borders then
+      vim.api.nvim_set_hl(0, "FloatBorder", {
+        bg = "#1a1a1a",
+        fg = "#4a4a4a"
+      })
+      vim.api.nvim_set_hl(0, "TelescopeBorder", {
+        bg = "#1a1a1a",
+        fg = "#4a4a4a"
+      })
+      vim.api.nvim_set_hl(0, "VertSplit", {
+        bg = "none",
+        fg = "#2a2a2a"
+      })
+      vim.api.nvim_set_hl(0, "WinSeparator", {
+        bg = "none",
+        fg = "#2a2a2a"
+      })
+    end
+  else
+    -- Fallback to simple transparency
+    for _, group in ipairs(M.config.groups) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass(group, 0) -- Fully transparent
+      end
+    end
+  end
+
+  -- Apply transparency to extra groups
+  for _, group in ipairs(M.config.extra_groups) do
+    if not vim.tbl_contains(M.config.exclude_groups, group) then
+      create_glass(group, M.config.glass.panel_opacity.floats)
+    end
+  end
+
+  -- Special cursor line handling for glass effect
+  if M.config.enable.cursorline then
+    vim.api.nvim_set_hl(0, "CursorLine", {
+      bg = "#0f0f0f",
+    })
+    vim.api.nvim_set_hl(0, "CursorLineNr", {
+      bg = "none",
+    })
+  end
+
+  -- Configure blending for floating elements
+  vim.opt.winblend = math.floor(M.config.glass.panel_opacity.floats * 100)
+  vim.opt.pumblend = math.floor(M.config.glass.panel_opacity.popups * 100)
+
+  -- Force terminal gui colors
+  vim.opt.termguicolors = true
+end
+
+-- Function to get all highlight groups (for debugging/inspection)
+local function get_all_highlight_groups()
+  local groups = {}
+  local all_highlights = vim.api.nvim_get_hl(0, {})
+
+  for name, _ in pairs(all_highlights) do
+    table.insert(groups, name)
+  end
+
+  table.sort(groups)
+  return groups
+end
+
+-- Setup function
+function M.setup(user_config)
+  M.config = vim.tbl_deep_extend("force", default_config, user_config or {})
+
+  -- Override vim.cmd.colorscheme to auto-apply transparency
+  vim.cmd.colorscheme = function(scheme)
+    original_colorscheme(scheme)
+    -- Small delay to ensure colorscheme is fully loaded
+    vim.defer_fn(apply_transparency, 10)
+  end
+
+  -- Create autocommand for ColorScheme event
+  vim.api.nvim_create_augroup("GlassNvim", { clear = true })
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = "GlassNvim",
+    pattern = "*",
+    callback = function()
+      vim.defer_fn(apply_transparency, 10)
+    end,
+  })
+
+  -- Apply transparency on initial load
+  apply_transparency()
+
+  -- Create user commands
+  vim.api.nvim_create_user_command("Glassify", function()
+    M.config.glass.enable = true
+    apply_transparency()
+    print("Nvim glassified ⋆｡°✩")
+  end, { desc = "Enable glass effect" })
+
+  vim.api.nvim_create_user_command("UnGlassify", function()
+    M.config.glass.enable = false
+    vim.cmd.colorscheme(vim.g.colors_name or "default")
+    print("Glass effect disabled")
+  end, { desc = "Disable glass effect" })
+
+  vim.api.nvim_create_user_command("GlassToggle", function()
+    if M.config.glass.enable then
+      vim.cmd.UnGlassify()
+    else
+      vim.cmd.Glassify()
+    end
+  end, { desc = "Toggle glass effect" })
+
+  vim.api.nvim_create_user_command("GlassListGroups", function()
+    local groups = get_all_highlight_groups()
+    print("All highlight groups:")
+    for _, group in ipairs(groups) do
+      print("  " .. group)
+    end
+  end, { desc = "List all highlight groups" })
+
+  -- Mark as enabled
+  vim.g.glass_enabled = M.config.glass.enable
+end
+
+-- Utility functions
+function M.clear_prefix(prefix)
+  local groups = get_all_highlight_groups()
+  for _, group in ipairs(groups) do
+    if string.match(group, "^" .. prefix) then
+      create_glass(group, M.config.glass.panel_opacity.floats)
+    end
+  end
+end
+
+function M.clear_group(group, opacity)
+  opacity = opacity or 0
+  create_glass(group, opacity)
+end
+
+function M.add_group(group, opacity)
+  opacity = opacity or M.config.glass.panel_opacity.floats
+  table.insert(M.config.extra_groups, group)
+  create_glass(group, opacity)
+end
+
+function M.remove_group(group)
+  for i, g in ipairs(M.config.extra_groups) do
+    if g == group then
+      table.remove(M.config.extra_groups, i)
+      break
+    end
+  end
+end
+
+-- Apply transparency (expose for manual calling)
+function M.apply_transparency()
+  apply_transparency()
+end
+
+-- Get current configuration
+function M.get_config()
+  return M.config
+end
+
+return M
