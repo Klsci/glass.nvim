@@ -102,9 +102,9 @@ local function create_glass(group_name, opacity_level, border_color)
     end
 
     -- Add border if specified
-    if border_color and M.config.glass.frosted_borders then
-      new_hl.border = border_color
-    end
+    -- if border_color and M.config.glass.frosted_borders then
+    --   new_hl.border = border_color
+    -- end
 
     vim.api.nvim_set_hl(0, group_name, new_hl)
   end
