@@ -226,11 +226,11 @@ local function apply_transparency()
     end
   else
     -- Fallback to simple transparency
-    for _, group in ipairs(M.config.groups) do
-      if not vim.tbl_contains(M.config.exclude_groups, group) then
-        create_glass(group, 0) -- Fully transparent
-      end
-    end
+    -- for _, group in ipairs(M.config.groups) do
+    --   if not vim.tbl_contains(M.config.exclude_groups, group) then
+    --     create_glass(group, 0) -- Fully transparent
+    --   end
+    -- end
   end
 
   -- Apply transparency to extra groups
