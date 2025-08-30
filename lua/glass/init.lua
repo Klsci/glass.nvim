@@ -13,11 +13,11 @@ local default_config = {
     blur_background = true,
     frosted_borders = true,
     panel_opacity = {
-      editor = 0.0,     -- Main editor completely transparent
-      sidebar = 0.15,   -- Sidebars slightly tinted
-      statusline = 0.1, -- Status line subtle tint
-      floats = 0.2,     -- Floating windows more visible
-      popups = 0.25,    -- Popups most visible
+      editor = 0.0, -- Main editor completely transparent
+      -- sidebar = 0.15,   -- Sidebars slightly tinted
+      -- statusline = 0.1, -- Status line subtle tint
+      floats = 0.2,  -- Floating windows more visible
+      popups = 0.25, -- Popups most visible
     }
   },
   -- Groups that should always be transparent
