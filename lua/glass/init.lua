@@ -6,289 +6,322 @@ local M = {}
 
 -- Default configuration
 local default_config = {
+  -- Glass pane effect settings
   glass = {
     enable = true,
-    -- how strongly the overlay color is mixed with the scheme 'Normal' background:
-    -- 0 = keep scheme bg, 1 = full tint color
-    tint_strength = 0.55,
-    -- panel opacities used for blending window content with the terminal beneath:
+    opacity = 0.85,
+    blur_background = true,
+    frosted_borders = true,
     panel_opacity = {
-      editor = 0.0, -- editor tint strength (0 -> mostly scheme bg)
-      sidebar = 0.15,
-      statusline = 0.1,
-      floats = 0.18, -- how opaque float backgrounds are (0..1)
-      popups = 0.22,
+      editor = 0.0,     -- Main editor completely transparent
+      sidebar = 0.15,   -- Sidebars slightly tinted
+      statusline = 0.1, -- Status line subtle tint
+      floats = 0.2,     -- Floating windows more visible
+      popups = 0.25,    -- Popups most visible
     }
   },
-  overlay = {
-    enable = true,
-    -- winblend value applied to each normal window (0..100) - higher = more transparent
-    blend = 30,
-    -- fallback tint if colorscheme doesn't provide normal bg
-    tint = "#0b0b0b",
-    zindex = 50, -- zindex for floats we create (we don't create a fullscreen float by default)
-    cover_statusline = true,
-    cover_tabline = true,
+  -- Groups that should always be transparent
+  groups = {
+    'Normal', 'NormalNC', 'Comment', 'Constant', 'Special', 'Identifier',
+    'Statement', 'PreProc', 'Type', 'Underlined', 'Todo', 'String', 'Function',
+    'Conditional', 'Repeat', 'Operator', 'Structure', 'LineNr', 'NonText',
+    'SignColumn', 'CursorColumn', 'CursorLine', 'TabLine', 'TabLineSel', 'TabLineFill',
+    'StatusLine', 'StatusLineNC', 'VertSplit', 'WinSeparator', 'Visual', 'VisualNOS',
+    'Folded', 'FoldColumn', 'DiffAdd', 'DiffChange', 'DiffDelete', 'DiffText',
+    'SignColumn', 'Conceal', 'EndOfBuffer', 'SearchResult'
   },
-  -- groups that we set to NONE by default so the terminal can show through
-  make_transparent_groups = {
-    'Normal', 'NormalNC', 'SignColumn', 'LineNr', 'EndOfBuffer',
-    'FoldColumn', 'CursorLine', 'CursorColumn', 'ColorColumn',
+  -- Extra groups (plugin-specific)
+  extra_groups = {
+    'NormalFloat', 'FloatBorder', 'Pmenu', 'PmenuSel', 'PmenuSbar', 'PmenuThumb',
+    'TelescopeNormal', 'TelescopeBorder', 'TelescopePromptNormal', 'TelescopePromptBorder',
+    'TelescopePromptTitle', 'TelescopePreviewTitle', 'TelescopeResultsTitle',
+    'NvimTreeNormal', 'NvimTreeNormalNC', 'NvimTreeRootFolder', 'NeoTreeNormal', 'NeoTreeNormalNC',
+    'WhichKey', 'WhichKeyFloat', 'WhichKeyGroup', 'WhichKeyDesc',
+    'GitSignsAdd', 'GitSignsChange', 'GitSignsDelete',
+    'LspDiagnosticsDefaultError', 'LspDiagnosticsDefaultWarning', 'LspDiagnosticsDefaultInformation',
+    'LspDiagnosticsDefaultHint',
+    'DiagnosticError', 'DiagnosticWarn', 'DiagnosticInfo', 'DiagnosticHint',
+    'CmpNormal', 'CmpBorder', 'CmpDocumentation', 'CmpDocumentationBorder',
+    'NotifyBackground', 'NotifyERRORBody', 'NotifyWARNBody', 'NotifyINFOBody', 'NotifyDEBUGBody', 'NotifyTRACEBody',
+    'MasonNormal', 'MasonHeader', 'MasonHighlight',
+    'LazyNormal', 'LazyButton', 'LazyButtonActive',
   },
-  -- groups we will explicitly adjust for floats/popups
-  popup_groups = {
-    'NormalFloat', 'Pmenu', 'PmenuSel', 'CmpNormal', 'TelescopeNormal', 'WhichKeyFloat'
-  },
+  -- Exclude certain groups from transparency
+  exclude_groups = {},
+  -- Exclude specific colorschemes from auto-transparency
   exclude_schemes = {},
+  -- Enable/disable features
   enable = {
     cursorline = true,
     statusline = true,
+    tabline = true,
+    winbar = true,
   }
 }
 
-M.config = vim.deepcopy(default_config)
+-- Module state
+M.config = default_config
+local original_colorscheme = vim.cmd.colorscheme
 
--- Utility: parse different forms of hl.bg into "#rrggbb" string
-local function hl_bg_to_hex(bg)
-  if not bg then return nil end
-  local t = type(bg)
-  if t == "string" then
-    if bg:sub(1, 1) == "#" then
-      -- already hex
-      if #bg == 7 then return bg:lower() end
-      if #bg == 9 then return bg:sub(1, 7):lower() end
-      return bg:lower()
+-- Function to create glass pane effect with subtle background
+local function create_glass_pane(group_name, opacity_level, border_color)
+  -- Use pcall to safely get highlight group
+  local success, hl = pcall(vim.api.nvim_get_hl, 0, { name = group_name, link = false })
+  if not success then
+    -- Fallback: create a new highlight group
+    hl = {}
+  end
+
+  -- Ensure hl is a table
+  if type(hl) ~= "table" then
+    hl = {}
+  end
+
+  -- Create a very subtle tinted background for glass effect
+  local bg_color = nil
+  if opacity_level > 0 then
+    -- Use a subtle dark overlay for glass panels
+    local overlay_colors = {
+      [0.05] = "#050505", -- Minimal tint
+      [0.08] = "#080808", -- Status line
+      [0.1] = "#0a0a0a",  -- Very subtle
+      [0.12] = "#0c0c0c", -- Sidebar subtle
+      [0.15] = "#0f0f0f", -- Sidebar normal
+      [0.18] = "#121212", -- Float subtle
+      [0.2] = "#141414",  -- Float normal
+      [0.22] = "#161616", -- Popup subtle
+      [0.25] = "#1a1a1a", -- Popup normal
+      [0.3] = "#1e1e1e",  -- Strong glass
+    }
+    bg_color = overlay_colors[opacity_level] or "#0f0f0f"
+  end
+
+  hl.bg = bg_color
+
+  -- Note: border_color is used for related border highlight groups
+  -- but not applied directly to this group since 'border' is not a valid hl key
+
+  vim.api.nvim_set_hl(0, group_name, hl)
+end
+
+-- Main transparency function with glass pane effects
+local function apply_transparency()
+  -- Skip if current colorscheme is in exclude list
+  local current_scheme = vim.g.colors_name or ""
+  if vim.tbl_contains(M.config.exclude_schemes, current_scheme) then
+    return
+  end
+
+  if M.config.glass.enable then
+    -- Apply glass pane effects with varying opacity levels
+
+    -- Main editor - completely transparent
+    for _, group in ipairs({ 'Normal', 'NormalNC', 'SignColumn', 'LineNr', 'EndOfBuffer' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass_pane(group, M.config.glass.panel_opacity.editor)
+      end
     end
-    -- unknown string form: ignore
-    return nil
-  elseif t == "number" then
-    local n = bg
-    local r = math.floor(n / 65536) % 256
-    local g = math.floor(n / 256) % 256
-    local b = n % 256
-    return string.format("#%02x%02x%02x", r, g, b)
-  end
-  return nil
-end
 
--- Utility: parse "#rrggbb" to r,g,b numbers
-local function hex_to_rgb(hex)
-  if not hex then return nil end
-  hex = hex:gsub("#", "")
-  if #hex ~= 6 then return nil end
-  local r = tonumber(hex:sub(1, 2), 16)
-  local g = tonumber(hex:sub(3, 4), 16)
-  local b = tonumber(hex:sub(5, 6), 16)
-  return r, g, b
-end
+    -- Sidebar elements - subtle tint
+    for _, group in ipairs({ 'NvimTreeNormal', 'NeoTreeNormal', 'NvimTreeNormalNC', 'NeoTreeNormalNC' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass_pane(group, M.config.glass.panel_opacity.sidebar)
+      end
+    end
 
--- Utility: linear blend between two hex colors
-local function blend_hex(a_hex, b_hex, alpha)
-  -- return color = (1-alpha)*a + alpha*b
-  if not a_hex and not b_hex then return nil end
-  if not a_hex then a_hex = "#000000" end
-  if not b_hex then b_hex = "#000000" end
-  local ar, ag, ab = hex_to_rgb(a_hex)
-  local br, bg, bb = hex_to_rgb(b_hex)
-  if not (ar and br) then return nil end
-  local r = math.floor((1 - alpha) * ar + alpha * br + 0.5)
-  local g = math.floor((1 - alpha) * ag + alpha * bg + 0.5)
-  local b = math.floor((1 - alpha) * ab + alpha * bb + 0.5)
-  return string.format("#%02x%02x%02x", r, g, b)
-end
+    -- Status line - subtle glass panel
+    if M.config.enable.statusline then
+      for _, group in ipairs({ 'StatusLine', 'StatusLineNC' }) do
+        if not vim.tbl_contains(M.config.exclude_groups, group) then
+          create_glass_pane(group, M.config.glass.panel_opacity.statusline)
+        end
+      end
+    end
 
--- Create highlight groups used for overlay/floats
-local function create_overlay_highlights()
-  -- Get Normal bg from current colorscheme (if any)
-  local ok, normal_hl = pcall(vim.api.nvim_get_hl, 0, { name = "Normal" })
-  local normal_bg = nil
-  if ok and normal_hl then
-    normal_bg = hl_bg_to_hex(normal_hl.bg)
-  end
-  local tint = M.config.overlay.tint or "#0b0b0b"
-  local tint_strength = M.config.glass.tint_strength or 0.55
+    -- Tab line - subtle glass panel
+    if M.config.enable.tabline then
+      for _, group in ipairs({ 'TabLine', 'TabLineFill', 'TabLineSel' }) do
+        if not vim.tbl_contains(M.config.exclude_groups, group) then
+          create_glass_pane(group, M.config.glass.panel_opacity.statusline)
+        end
+      end
+    end
 
-  -- overlay base color: mix scheme Normal bg with tint
-  local overlay_color = nil
-  if normal_bg then
-    overlay_color = blend_hex(normal_bg, tint, tint_strength)
+    -- Floating windows - more visible glass
+    for _, group in ipairs({ 'NormalFloat', 'TelescopeNormal', 'WhichKeyFloat', 'LspFloatWinNormal', 'LazyNormal' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass_pane(group, M.config.glass.panel_opacity.floats, "#2a2a2a")
+      end
+    end
+
+    -- Popup menus - most visible glass panels
+    for _, group in ipairs({ 'Pmenu', 'PmenuSel', 'CmpNormal' }) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass_pane(group, M.config.glass.panel_opacity.popups, "#333333")
+      end
+    end
+
+    -- Special handling for borders to create frosted glass effect
+    if M.config.glass.frosted_borders then
+      vim.api.nvim_set_hl(0, "FloatBorder", {
+        bg = "#1a1a1a",
+        fg = "#4a4a4a"
+      })
+      vim.api.nvim_set_hl(0, "TelescopeBorder", {
+        bg = "#1a1a1a",
+        fg = "#4a4a4a"
+      })
+      vim.api.nvim_set_hl(0, "VertSplit", {
+        bg = "none",
+        fg = "#2a2a2a"
+      })
+      vim.api.nvim_set_hl(0, "WinSeparator", {
+        bg = "none",
+        fg = "#2a2a2a"
+      })
+    end
   else
-    overlay_color = tint
-  end
-
-  -- For floats we want a slightly different overlay (usually more visible)
-  local float_base = blend_hex(normal_bg or tint, tint, 0.75)
-
-  -- Create highlight groups
-  vim.api.nvim_set_hl(0, "GlassOverlayNormal", { bg = overlay_color, fg = "NONE" })
-  vim.api.nvim_set_hl(0, "GlassOverlaySidebar", { bg = blend_hex(overlay_color, "#000000", 0.12), fg = "NONE" })
-  vim.api.nvim_set_hl(0, "GlassOverlayFloat", { bg = float_base, fg = "NONE" })
-  vim.api.nvim_set_hl(0, "GlassOverlayPopup", { bg = blend_hex(float_base, "#000000", 0.08), fg = "NONE" })
-  vim.api.nvim_set_hl(0, "GlassOverlayBorder", { bg = "NONE", fg = "#4a4a4a" })
-
-  -- Ensure Visual/Selection remains visible (don't override)
-  -- We only tweak backgrounds for Non-visual groups; Visual keeps its colors
-end
-
--- Make core groups transparent (so terminal background shows through)
-local function make_core_groups_transparent()
-  for _, g in ipairs(M.config.make_transparent_groups) do
-    -- set to NONE so terminal bg shows through if no winblend
-    pcall(vim.api.nvim_set_hl, 0, g, { bg = "NONE" })
-  end
-end
-
--- Apply per-window tint + winblend to normal windows
-local function apply_win_tint_to_window(win, opts)
-  opts = opts or {}
-  local is_float = false
-  local ok, cfg = pcall(vim.api.nvim_win_get_config, win)
-  if ok and cfg and cfg.relative and cfg.relative ~= "" then
-    is_float = true
-  end
-
-  if is_float then
-    -- For floats: use float-highlight and a float-specific winblend (derived from config)
-    local float_opacity = M.config.glass.panel_opacity.floats or 0.18
-    local wb = math.floor((1 - float_opacity) * 100) -- if floats specify how opaque they are, invert to winblend
-    if wb < 0 then wb = 0 end
-    if wb > 100 then wb = 100 end
-    -- set winhighlight to use float groups and border
-    pcall(vim.api.nvim_set_option_value, "winhighlight", "Normal:GlassOverlayFloat,FloatBorder:GlassOverlayBorder",
-      { scope = "win", win = win })
-    pcall(vim.api.nvim_set_option_value, "winblend", wb, { scope = "win", win = win })
-  else
-    -- Normal editor windows: map Normal -> GlassOverlayNormal and apply configured blend
-    pcall(vim.api.nvim_set_option_value, "winhighlight", "Normal:GlassOverlayNormal,NormalNC:GlassOverlayNormal",
-      { scope = "win", win = win })
-    local wb = M.config.overlay.blend or 30
-    pcall(vim.api.nvim_set_option_value, "winblend", wb, { scope = "win", win = win })
-  end
-end
-
--- Re-apply tint to all windows (used at startup and on colorscheme)
-local function apply_tint_to_all_windows()
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    -- skip our own ephemeral windows? none created by this plugin here, so just apply to all
-    local success, _ = pcall(vim.api.nvim_win_get_config, win)
-    if success then
-      apply_win_tint_to_window(win)
+    -- Fallback to simple transparency
+    for _, group in ipairs(M.config.groups) do
+      if not vim.tbl_contains(M.config.exclude_groups, group) then
+        create_glass_pane(group, 0) -- Fully transparent
+      end
     end
   end
-end
 
--- When a new window appears, make sure it gets the tint/blend applied
-local function on_win_created_autocmd()
-  local aug = vim.api.nvim_create_augroup("GlassNvimWindow", { clear = true })
-  vim.api.nvim_create_autocmd({ "WinNew" }, {
-    group = aug,
-    callback = function()
-      -- small defer to allow window config to settle
-      vim.defer_fn(function()
-        local win = vim.api.nvim_get_current_win()
-        apply_win_tint_to_window(win)
-      end, 10)
-    end,
-  })
-end
+  -- Apply transparency to extra groups
+  for _, group in ipairs(M.config.extra_groups) do
+    if not vim.tbl_contains(M.config.exclude_groups, group) then
+      create_glass_pane(group, M.config.glass.panel_opacity.floats)
+    end
+  end
 
--- When colorscheme changes: recreate overlay highlights and reapply to windows
-local function on_colorscheme_autocmd()
-  local aug = vim.api.nvim_create_augroup("GlassNvimColors", { clear = true })
-  vim.api.nvim_create_autocmd({ "ColorScheme" }, {
-    group = aug,
-    callback = function()
-      -- rebuild hl groups and reapply tints
-      create_overlay_highlights()
-      make_core_groups_transparent()
-      -- reapply to windows (defer to avoid race)
-      vim.defer_fn(apply_tint_to_all_windows, 10)
-    end,
-  })
-end
+  -- Special cursor line handling for glass effect
+  if M.config.enable.cursorline then
+    vim.api.nvim_set_hl(0, "CursorLine", {
+      bg = "#0f0f0f",
+    })
+    vim.api.nvim_set_hl(0, "CursorLineNr", {
+      bg = "none",
+    })
+  end
 
--- Keep tints correct after resize
-local function on_resize_autocmd()
-  local aug = vim.api.nvim_create_augroup("GlassNvimResize", { clear = true })
-  vim.api.nvim_create_autocmd({ "VimResized" }, {
-    group = aug,
-    callback = function()
-      -- nothing special to resize, but reapply in case float sizes changed
-      vim.defer_fn(apply_tint_to_all_windows, 10)
-    end,
-  })
-end
+  -- Configure blending for floating elements
+  vim.opt.winblend = math.floor(M.config.glass.panel_opacity.floats * 100)
+  vim.opt.pumblend = math.floor(M.config.glass.panel_opacity.popups * 100)
 
--- Public setup function
-function M.setup(user_config)
-  M.config = vim.tbl_deep_extend("force", M.config, user_config or {})
-
-  -- force termguicolors
+  -- Force terminal gui colors
   vim.opt.termguicolors = true
+end
 
-  -- ensure core groups transparent so terminal background is visible
-  make_core_groups_transparent()
+-- Function to get all highlight groups (for debugging/inspection)
+local function get_all_highlight_groups()
+  local groups = {}
+  local all_highlights = vim.api.nvim_get_hl(0, {})
 
-  -- create overlay highlight groups (based on current colorscheme)
-  create_overlay_highlights()
+  for name, _ in pairs(all_highlights) do
+    table.insert(groups, name)
+  end
 
-  -- apply win tints to current windows
-  apply_tint_to_all_windows()
+  table.sort(groups)
+  return groups
+end
 
-  -- setup autocmds
-  on_colorscheme_autocmd()
-  on_win_created_autocmd()
-  on_resize_autocmd()
+-- Setup function
+function M.setup(user_config)
+  M.config = vim.tbl_deep_extend("force", default_config, user_config or {})
 
-  -- commands to toggle/plugin control
-  vim.api.nvim_create_user_command("GlassApply", function()
-    create_overlay_highlights()
-    make_core_groups_transparent()
-    apply_tint_to_all_windows()
-    print("Glass: applied")
-  end, {})
+  -- Override vim.cmd.colorscheme to auto-apply transparency
+  vim.cmd.colorscheme = function(scheme)
+    original_colorscheme(scheme)
+    -- Small delay to ensure colorscheme is fully loaded
+    vim.defer_fn(apply_transparency, 10)
+  end
+
+  -- Create autocommand for ColorScheme event
+  vim.api.nvim_create_augroup("GlassNvim", { clear = true })
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = "GlassNvim",
+    pattern = "*",
+    callback = function()
+      vim.defer_fn(apply_transparency, 10)
+    end,
+  })
+
+  -- Apply transparency on initial load
+  apply_transparency()
+
+  -- Create user commands
+  vim.api.nvim_create_user_command("GlassEnable", function()
+    M.config.glass.enable = true
+    apply_transparency()
+    print("Glass effect enabled")
+  end, { desc = "Enable glass effect" })
 
   vim.api.nvim_create_user_command("GlassDisable", function()
-    -- remove winhighlight and winblend from all windows and restore group bg=NONE
-    for _, win in ipairs(vim.api.nvim_list_wins()) do
-      pcall(vim.api.nvim_set_option_value, "winhighlight", "", { scope = "win", win = win })
-      pcall(vim.api.nvim_set_option_value, "winblend", 0, { scope = "win", win = win })
-    end
-    for _, g in ipairs(M.config.make_transparent_groups) do
-      pcall(vim.api.nvim_set_hl, 0, g, { bg = "NONE" })
-    end
-    print("Glass: disabled")
-  end, {})
+    M.config.glass.enable = false
+    vim.cmd.colorscheme(vim.g.colors_name or "default")
+    print("Glass effect disabled")
+  end, { desc = "Disable glass effect" })
 
   vim.api.nvim_create_user_command("GlassToggle", function()
-    M.config.glass.enable = not M.config.glass.enable
     if M.config.glass.enable then
-      create_overlay_highlights()
-      apply_tint_to_all_windows()
-      print("Glass: enabled")
+      vim.cmd.GlassDisable()
     else
-      vim.cmd("GlassDisable")
+      vim.cmd.GlassEnable()
     end
-  end, {})
+  end, { desc = "Toggle glass effect" })
 
-  -- ensure plugin re-applies after a manual colorscheme load via vim.cmd.colorscheme
-  local original_colorscheme = vim.cmd.colorscheme
-  vim.cmd.colorscheme = function(s)
-    original_colorscheme(s)
-    vim.defer_fn(function()
-      create_overlay_highlights()
-      make_core_groups_transparent()
-      apply_tint_to_all_windows()
-    end, 10)
+  vim.api.nvim_create_user_command("GlassListGroups", function()
+    local groups = get_all_highlight_groups()
+    print("All highlight groups:")
+    for _, group in ipairs(groups) do
+      print("  " .. group)
+    end
+  end, { desc = "List all highlight groups" })
+
+  -- Mark as enabled
+  vim.g.glass_enabled = M.config.glass.enable
+end
+
+-- Utility functions
+function M.clear_prefix(prefix)
+  local groups = get_all_highlight_groups()
+  for _, group in ipairs(groups) do
+    if string.match(group, "^" .. prefix) then
+      create_glass_pane(group, M.config.glass.panel_opacity.floats)
+    end
   end
 end
 
--- expose helpers
-M._helpers = {
-  hl_bg_to_hex = hl_bg_to_hex,
-  blend_hex = blend_hex,
-  create_overlay_highlights = create_overlay_highlights,
-  apply_tint_to_all_windows = apply_tint_to_all_windows,
-}
+function M.clear_group(group, opacity)
+  opacity = opacity or 0
+  create_glass_pane(group, opacity)
+end
+
+function M.add_group(group, opacity)
+  opacity = opacity or M.config.glass.panel_opacity.floats
+  table.insert(M.config.extra_groups, group)
+  create_glass_pane(group, opacity)
+end
+
+function M.remove_group(group)
+  for i, g in ipairs(M.config.extra_groups) do
+    if g == group then
+      table.remove(M.config.extra_groups, i)
+      break
+    end
+  end
+end
+
+-- Apply transparency (expose for manual calling)
+function M.apply_transparency()
+  apply_transparency()
+end
+
+-- Get current configuration
+function M.get_config()
+  return M.config
+end
 
 return M
