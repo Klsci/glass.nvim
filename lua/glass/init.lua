@@ -65,6 +65,9 @@ local original_colorscheme = vim.cmd.colorscheme
 
 -- Function to create glass pane effect with subtle background
 local function create_glass_pane(group_name, opacity_level)
+  -- Ensure opacity_level is a valid number, default to 0 if nil
+  opacity_level = opacity_level or 0.0
+
   -- Use pcall to safely get highlight group
   local success, hl = pcall(vim.api.nvim_get_hl, 0, { name = group_name, link = false })
   if not success then
@@ -79,13 +82,13 @@ local function create_glass_pane(group_name, opacity_level)
 
   -- Create a very subtle tinted background for glass effect
   local bg_color = nil
-
   if opacity_level == 0.0 then
     bg_color = "none"    -- Fully transparent
   else
     bg_color = "#000000" -- Default to black if no overlay is defined
   end
 
+  -- Now safe to compare since opacity_level is guaranteed to be a number
   if opacity_level > 0.0 then
     -- Use a subtle dark overlay for glass panels
     local overlay_colors = {
@@ -104,10 +107,8 @@ local function create_glass_pane(group_name, opacity_level)
   end
 
   hl.bg = bg_color
-
   -- Note: border_color is used for related border highlight groups
   -- but not applied directly to this group since 'border' is not a valid hl key
-
   vim.api.nvim_set_hl(0, group_name, hl)
 end
 
