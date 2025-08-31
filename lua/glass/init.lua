@@ -13,8 +13,8 @@ local default_config = {
     blur_background = true,
     frosted_borders = true,
     panel_opacity = {
-      editor = 0.0, -- Main editor completely transparent
-      -- sidebar = 0.15,   -- Sidebars slightly tinted
+      editor = 0.0,  -- Main editor completely transparent
+      sidebar = 0.0, -- Sidebars slightly tinted
       -- statusline = 0.1, -- Status line subtle tint
       floats = 0.2,  -- Floating windows more visible
       popups = 0.25, -- Popups most visible
@@ -52,8 +52,8 @@ local default_config = {
   exclude_schemes = {},
   -- Enable/disable features
   enable = {
-    cursorline = true,
-    statusline = true,
+    cursorline = false,
+    statusline = false,
     tabline = true,
     winbar = true,
   }
@@ -64,7 +64,7 @@ M.config = default_config
 local original_colorscheme = vim.cmd.colorscheme
 
 -- Function to create glass pane effect with subtle background
-local function create_glass_pane(group_name, opacity_level, border_color)
+local function create_glass_pane(group_name, opacity_level)
   -- Use pcall to safely get highlight group
   local success, hl = pcall(vim.api.nvim_get_hl, 0, { name = group_name, link = false })
   if not success then
@@ -150,14 +150,14 @@ local function apply_transparency()
     -- Floating windows - more visible glass
     for _, group in ipairs({ 'NormalFloat', 'TelescopeNormal', 'WhichKeyFloat', 'LspFloatWinNormal', 'LazyNormal' }) do
       if not vim.tbl_contains(M.config.exclude_groups, group) then
-        create_glass_pane(group, M.config.glass.panel_opacity.floats, "#2a2a2a")
+        create_glass_pane(group, M.config.glass.panel_opacity.floats)
       end
     end
 
     -- Popup menus - most visible glass panels
     for _, group in ipairs({ 'Pmenu', 'PmenuSel', 'CmpNormal' }) do
       if not vim.tbl_contains(M.config.exclude_groups, group) then
-        create_glass_pane(group, M.config.glass.panel_opacity.popups, "#333333")
+        create_glass_pane(group, M.config.glass.panel_opacity.popups)
       end
     end
 
