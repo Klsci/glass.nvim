@@ -79,6 +79,13 @@ local function create_glass_pane(group_name, opacity_level)
 
   -- Create a very subtle tinted background for glass effect
   local bg_color = nil
+
+  if opacity_level == 0.0 then
+    bg_color = "none"    -- Fully transparent
+  else
+    bg_color = "#000000" -- Default to black if no overlay is defined
+  end
+
   if opacity_level > 0.0 then
     -- Use a subtle dark overlay for glass panels
     local overlay_colors = {
