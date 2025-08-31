@@ -9,15 +9,15 @@ local default_config = {
   -- Glass pane effect settings
   glass = {
     enable = true,
-    opacity = 0.85,
+    opacity = 0.05,
     blur_background = true,
     frosted_borders = true,
     panel_opacity = {
-      editor = 0.0,  -- Main editor completely transparent
-      sidebar = 0.0, -- Sidebars slightly tinted
-      -- statusline = 0.1, -- Status line subtle tint
-      floats = 0.2,  -- Floating windows more visible
-      popups = 0.25, -- Popups most visible
+      editor = 0.0,     -- Main editor completely transparent
+      sidebar = 0.0,    -- Sidebars slightly tinted
+      statusline = 0.1, -- Status line subtle tint
+      floats = 0.2,     -- Floating windows more visible
+      popups = 0.25,    -- Popups most visible
     }
   },
   -- Groups that should always be transparent
@@ -53,7 +53,7 @@ local default_config = {
   -- Enable/disable features
   enable = {
     cursorline = false,
-    statusline = false,
+    statusline = true,
     tabline = true,
     winbar = true,
   }
